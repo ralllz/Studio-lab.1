@@ -1,0 +1,270 @@
+<!-- 
+🚀 QUICK START - LANGSUNG PAKAI!
+
+1. COPY-PASTE kode ini ke dalam <head> tag di index.html (jika ingin pure JavaScript tanpa React)
+2. ATAU gunakan files TypeScript yang sudah dibuat:
+   - src/lib/supabaseClient.ts → Configuration credentials
+   - src/hooks/useTemplateSync.ts → React hook untuk auto sync
+
+INSTRUKSI SETUP (3 LANGKAH):
+1. Setup Supabase project & tabel (lihat SUPABASE_SETUP.md)
+2. Ganti SUPABASE_URL dan SUPABASE_ANON_KEY di src/lib/supabaseClient.ts
+3. Hook sudah integrated ke src/App.tsx - done! ✅
+-->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Template Sync dengan Supabase</title>
+</head>
+<body>
+    <!-- 
+    OPSI 1: Pure JavaScript (tanpa React)
+    
+    Copy-paste script ini ke dalam <body> dan gunakan langsung
+    (Jika menggunakan React, skip ini dan gunakan files TypeScript)
+    -->
+    <script>
+        // ==================== SUPABASE CLIENT ====================
+        
+        const SUPABASE_URL = 'https://srmfpdxuqqrdhrnjarsj.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNybWZwZHh1cXFyZGhybmphcnNqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEwMDU3NjUsImV4cCI6MjA4NjU4MTc2NX0.s5uQIm5Gdshe5P2M8AmJtVFk9RobaFtLITdtHJ_oD1M'; // ← GANTI
+        
+        class SupabaseTemplateSync {
+            constructor(url, key) {
+                this.url = url;
+                this.key = key;
+                this.table = 'settings';
+            }
+
+            /**
+             * Dapatkan User ID unik
+             */
+            getUserId() {
+                let id = localStorage.getItem('app_user_id');
+                if (!id) {
+                    id = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                    localStorage.setItem('app_user_id', id);
+                }
+                return id;
+            }
+
+            /**
+             * Simpan template
+             */
+            async saveTemplate(templateName) {
+                try {
+                    const userId = this.getUserId();
+                    const now = new Date().toISOString();
+
+                    // Simpan ke localStorage
+                    localStorage.setItem('last_selected_template', templateName);
+                    localStorage.setItem('template_sync_time', now);
+
+                    // Kirim ke Supabase
+                    const queryUrl = `${this.url}/rest/v1/${this.table}?user_id=eq.${userId}&select=id`;
+                    
+                    const checkResponse = await fetch(queryUrl, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${this.key}`,
+                            'apikey': this.key
+                        }
+                    });
+
+                    const existing = await checkResponse.json();
+                    const restUrl = `${this.url}/rest/v1/${this.table}`;
+
+                    if (existing.length > 0) {
+                        // UPDATE
+                        await fetch(`${restUrl}?user_id=eq.${userId}`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Authorization': `Bearer ${this.key}`,
+                                'apikey': this.key,
+                                'Content-Type': 'application/json',
+                                'Prefer': 'return=minimal'
+                            },
+                            body: JSON.stringify({
+                                template_name: templateName,
+                                updated_at: now
+                            })
+                        });
+                    } else {
+                        // INSERT
+                        await fetch(restUrl, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${this.key}`,
+                                'apikey': this.key,
+                                'Content-Type': 'application/json',
+                                'Prefer': 'return=minimal'
+                            },
+                            body: JSON.stringify({
+                                user_id: userId,
+                                template_name: templateName,
+                                created_at: now,
+                                updated_at: now
+                            })
+                        });
+                    }
+                    
+                    console.log('✅ Template saved:', templateName);
+                    return true;
+                } catch (error) {
+                    console.warn('⚠️ Supabase error, fallback to localStorage:', error);
+                    return true;
+                }
+            }
+
+            /**
+             * Load template
+             */
+            async loadTemplate() {
+                try {
+                    const userId = this.getUserId();
+                    const url = `${this.url}/rest/v1/${this.table}?user_id=eq.${userId}&select=template_name&order=updated_at.desc&limit=1`;
+
+                    const response = await fetch(url, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${this.key}`,
+                            'apikey': this.key
+                        }
+                    });
+
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                    const data = await response.json();
+                    if (data.length > 0) {
+                        const template = data[0].template_name;
+                        localStorage.setItem('last_selected_template', template);
+                        console.log('✅ Template loaded from Supabase:', template);
+                        return template;
+                    }
+
+                    // Fallback ke localStorage
+                    const cached = localStorage.getItem('last_selected_template');
+                    if (cached) {
+                        console.log('💾 Template loaded from localStorage:', cached);
+                        return cached;
+                    }
+
+                    return null;
+                } catch (error) {
+                    console.warn('⚠️ Error loading from Supabase, using localStorage:', error);
+                    return localStorage.getItem('last_selected_template');
+                }
+            }
+        }
+
+        // ==================== PENGGUNAAN ====================
+
+        const templateSync = new SupabaseTemplateSync(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // SAAT PAGE LOAD: Ambil template terakhir
+        window.addEventListener('DOMContentLoaded', async () => {
+            const lastTemplate = await templateSync.loadTemplate();
+            if (lastTemplate) {
+                console.log('🎨 Menerapkan template:', lastTemplate);
+                // Terapkan ke UI Anda di sini
+            }
+        });
+
+        // SAAT USER PILIH TEMPLATE: Simpan
+        async function onTemplateSelected(templateName) {
+            console.log('💾 Menyimpan template:', templateName);
+            await templateSync.saveTemplate(templateName);
+        }
+
+        // ==================== CONTOH IMPLEMENTASI ====================
+
+        // Jika Anda punya button untuk memilih template:
+        document.addEventListener('DOMContentLoaded', () => {
+            // Contoh: <button onclick="selectTemplate('Classic Frame')">Classic Frame</button>
+            window.selectTemplate = async (name) => {
+                await onTemplateSelected(name);
+                // Update UI template di sini
+                document.body.style.backgroundColor = 
+                    name === 'Classic Frame' ? '#f0f0f0' : '#fff';
+            };
+        });
+
+    </script>
+
+    <!-- CONTOH HTML BUTTONS -->
+    <div id="templates">
+        <button onclick="selectTemplate('Classic Frame')">📷 Classic Frame</button>
+        <button onclick="selectTemplate('Triple Strip')">🎬 Triple Strip</button>
+        <button onclick="selectTemplate('Four Square')">4️⃣ Four Square</button>
+    </div>
+
+</body>
+</html>
+
+<!-- 
+================================
+DOKUMENTASI SINGKAT
+================================
+
+1. SETUP SUPABASE
+   
+   a) Buka https://app.supabase.com
+   b) Buat project baru atau gunakan yang existing
+   c) Di SQL Editor, jalankan:
+   
+       CREATE TABLE IF NOT EXISTS settings (
+         id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+         user_id TEXT NOT NULL UNIQUE,
+         template_name TEXT NOT NULL,
+         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+         updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+       );
+       
+       ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+       
+       CREATE POLICY "Allow public access" ON settings
+         FOR ALL USING (true) WITH CHECK (true);
+   
+   d) Di Settings > API, copy Project URL dan Anon Key
+
+2. UPDATE CREDENTIALS
+   
+   Ganti di file ini atau di src/lib/supabaseClient.ts:
+   
+   const SUPABASE_URL = 'https://abc123.supabase.co';
+   const SUPABASE_ANON_KEY = 'eyJ0eXAiOiJKV1QiLC...';
+
+3. GUNAKAN FUNGSI
+
+   Untuk menyimpan:
+   await templateSync.saveTemplate('Classic Frame');
+   
+   Untuk memuat:
+   const template = await templateSync.loadTemplate();
+
+================================
+TROUBLESHOOTING
+================================
+
+❌ "Unauthorized" error
+✅ Pastikan SUPABASE_URL punya "https://" dan tidak ada trailing slash
+✅ Verifikasi SUPABASE_ANON_KEY benar (dari Settings > API)
+✅ Cek RLS policy sudah dibuat dengan "Allow public access"
+
+❌ Template tidak tersimpan
+✅ Buka DevTools (F12) > Console tab, lihat error message
+✅ Pastikan tabel "settings" exists di Supabase
+✅ Test apakah network request sampai ke supabase.co
+
+❌ Selalu load dari localStorage, bukan Supabase
+✅ Berarti Supabase error, tapi app masih aman (fallback)
+✅ Periksa browser console untuk error detail
+✅ Cek apakah koneksi internet stabil
+
+================================
+DOKUMENTASI LENGKAP
+================================
+
+Lihat: SUPABASE_SETUP.md (di folder project root)
+-->
