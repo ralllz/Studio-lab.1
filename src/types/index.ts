@@ -88,6 +88,7 @@ export interface AppState {
   customTemplates: Template[];
   addCustomTemplate: (template: Template) => void;
   removeCustomTemplate: (id: string) => void;
+  setCustomTemplates: (templates: Template[]) => void;
   
   // Captured images
   capturedImages: CapturedImage[];

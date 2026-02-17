@@ -145,6 +145,15 @@ export function CaptureSection() {
                   className="w-full h-full object-cover"
                 />
 
+                {/* Template overlay (visual guide during capture) */}
+                {selectedTemplate?.overlayImageUrl && (
+                  <img
+                    src={selectedTemplate.overlayImageUrl}
+                    alt="template overlay"
+                    className="photobooth-overlay"
+                  />
+                )}
+
                 {/* Countdown overlay */}
                 <AnimatePresence>
                   {isCapturing && countdown > 0 && (

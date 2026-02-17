@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useStore, defaultTemplates } from '@/store/useStore';
+import { upsertTemplateToSupabase, deleteTemplateFromSupabase } from '@/lib/supabaseTemplates';
 import type { Template, TemplateFrame } from '@/types';
 
 export function TemplateSection() {
@@ -111,6 +112,10 @@ export function TemplateSection() {
         aspectRatio: framesCount >= 4 ? '1:1' : '3:4',
       };
       addCustomTemplate(newTemplate);
+      // persist to Supabase (best-effort)
+      upsertTemplateToSupabase(newTemplate).then((ok) => {
+        if (!ok) console.warn('Failed to persist template to Supabase');
+      });
       setIsDialogOpen(false);
       resetForm();
     }
@@ -131,7 +136,12 @@ export function TemplateSection() {
 
   const handleDeleteTemplate = () => {
     if (templateToDelete) {
+      // delete locally
       removeCustomTemplate(templateToDelete.id);
+      // delete remotely
+      deleteTemplateFromSupabase(templateToDelete.id).then((ok) => {
+        if (!ok) console.warn('Failed to delete template from Supabase');
+      });
       setTemplateToDelete(null);
     }
   };

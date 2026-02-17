@@ -102,6 +102,8 @@ export const useStore = create<AppState>()(
           customTemplates: state.customTemplates.filter((t) => t.id !== id),
           selectedTemplate: state.selectedTemplate?.id === id ? null : state.selectedTemplate,
         })),
+      setCustomTemplates: (templates: Template[]) =>
+        set(() => ({ customTemplates: templates })),
 
       // Captured images
       capturedImages: [],

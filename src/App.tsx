@@ -1,6 +1,8 @@
 import { AnimatePresence } from 'framer-motion';
 import { useStore } from '@/store/useStore';
 import { useSupabaseTemplateSync } from '@/hooks/useSupabaseTemplateSync';
+import { fetchTemplatesFromSupabase } from '@/lib/supabaseTemplates';
+import { useEffect } from 'react';
 import { HomeSection } from '@/sections/HomeSection';
 import { TemplateSection } from '@/sections/TemplateSection';
 import { CaptureSection } from '@/sections/CaptureSection';
@@ -10,6 +12,21 @@ import './App.css';
 function App() {
   const { currentStep, isDarkMode } = useStore();
   useSupabaseTemplateSync();
+
+  // Load templates from Supabase on app mount (merge into custom templates)
+  useEffect(() => {
+    (async () => {
+      try {
+        const remote = await fetchTemplatesFromSupabase();
+        if (remote && remote.length > 0) {
+          // set store custom templates
+          useStore.getState().setCustomTemplates(remote);
+        }
+      } catch (err) {
+        // ignore
+      }
+    })();
+  }, []);
 
   return (
     <div className={isDarkMode ? 'dark' : ''}>

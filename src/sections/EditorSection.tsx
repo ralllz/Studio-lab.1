@@ -265,11 +265,19 @@ export function EditorSection() {
         ctx.restore();
       }
 
-      // Layer 1: Draw template overlay
+      // Layer 1: Draw template overlay (preserve original aspect ratio, don't stretch)
       if (selectedTemplate.overlayImageUrl) {
         try {
           const templateImg = await loadImage(selectedTemplate.overlayImageUrl);
-          ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
+          // Compute draw size to preserve aspect ratio and avoid stretching
+          const imgW = templateImg.width;
+          const imgH = templateImg.height;
+          const scale = Math.min(1, Math.min(canvas.width / imgW, canvas.height / imgH));
+          const drawW = Math.round(imgW * scale);
+          const drawH = Math.round(imgH * scale);
+          const dx = Math.round((canvas.width - drawW) / 2);
+          const dy = Math.round((canvas.height - drawH) / 2);
+          ctx.drawImage(templateImg, dx, dy, drawW, drawH);
         } catch {
           // Template image failed to load
         }
