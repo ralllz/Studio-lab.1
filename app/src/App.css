@@ -1,0 +1,166 @@
+/* Custom styles for Web Photobooth */
+
+/* Smooth transitions */
+* {
+  transition-property: background-color, border-color;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Canvas styling */
+canvas {
+  image-rendering: -moz-crisp-edges;
+  image-rendering: -webkit-crisp-edges;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground));
+}
+
+/* Animation for gradient background */
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.gradient-animate {
+  background-size: 200% 200%;
+  animation: gradient-shift 8s ease infinite;
+}
+
+/* Filter preview styles */
+.filter-preview {
+  transition: filter 0.3s ease;
+}
+
+.filter-grayscale {
+  filter: grayscale(100%);
+}
+
+.filter-sepia {
+  filter: sepia(100%);
+}
+
+.filter-brightness {
+  filter: brightness(130%);
+}
+
+.filter-contrast {
+  filter: contrast(150%);
+}
+
+.filter-vintage {
+  filter: sepia(50%) contrast(120%) saturate(80%);
+}
+
+.filter-warm {
+  filter: sepia(30%) saturate(140%) hue-rotate(-10deg);
+}
+
+.filter-cool {
+  filter: saturate(80%) hue-rotate(10deg) brightness(105%);
+}
+
+/* Sticker drag styles */
+.sticker-dragging {
+  cursor: grabbing !important;
+  opacity: 0.8;
+}
+
+/* Text selection disabled for canvas */
+canvas {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .editor-canvas {
+    max-height: 50vh;
+  }
+}
+
+/* Button hover effects */
+button {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+button:active {
+  transform: scale(0.98);
+}
+
+/* Card hover effects */
+.card-hover {
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.card-hover:hover {
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.2);
+  transform: translateY(-2px);
+}
+
+/* Dark mode specific */
+.dark .glass-effect {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-effect {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Loading spinner */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+/* Pulse animation for capture button */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+}
+
+.capture-button-pulse::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
