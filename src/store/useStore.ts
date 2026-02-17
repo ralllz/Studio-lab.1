@@ -64,12 +64,39 @@ export const useStore = create<AppState>()(
 
       // Template
       selectedTemplate: null,
-      setSelectedTemplate: (template: Template | null) => set({ selectedTemplate: template }),
+      setSelectedTemplate: (template: Template | null) =>
+        set((state) => {
+          if (!template) return { selectedTemplate: null };
+
+          // If there are captured images, assign them to template frame indices sequentially
+          const framesCount = template.frames?.length || template.framesCount || 0;
+          if (state.capturedImages && state.capturedImages.length > 0 && framesCount > 0) {
+            const reassigned = state.capturedImages.map((img, idx) => ({
+              ...img,
+              frameIndex: idx < framesCount ? idx : idx % framesCount,
+            }));
+            return { selectedTemplate: template, capturedImages: reassigned };
+          }
+
+          return { selectedTemplate: template };
+        }),
       customTemplates: [],
-      addCustomTemplate: (template: Template) => 
-        set((state) => ({ 
-          customTemplates: [...state.customTemplates, template] 
-        })),
+      addCustomTemplate: (template: Template) =>
+        set((state) => {
+          const newCustoms = [...state.customTemplates, template];
+
+          // Automatically select the new template and map existing captured images into its frames
+          const framesCount = template.frames?.length || template.framesCount || 0;
+          if (state.capturedImages && state.capturedImages.length > 0 && framesCount > 0) {
+            const reassigned = state.capturedImages.map((img, idx) => ({
+              ...img,
+              frameIndex: idx < framesCount ? idx : idx % framesCount,
+            }));
+            return { customTemplates: newCustoms, selectedTemplate: template, capturedImages: reassigned };
+          }
+
+          return { customTemplates: newCustoms };
+        }),
       removeCustomTemplate: (id: string) =>
         set((state) => ({
           customTemplates: state.customTemplates.filter((t) => t.id !== id),

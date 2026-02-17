@@ -169,26 +169,71 @@ export function EditorSection() {
     };
 
     try {
-      // Layer 0: Draw captured photos (individual)
+      // Helper: generate grid frames if template frames missing or count mismatch
+      const generateGridFrames = (count: number, canvasW: number, canvasH: number) => {
+        // Prefer 3 rows x 2 cols for 6, otherwise try square-ish layout
+        const cols = count >= 2 ? 2 : 1;
+        const rows = Math.ceil(count / cols);
+        const padding = Math.round(Math.min(canvasW, canvasH) * 0.04); // 4% padding
+        const gap = Math.round(padding / 2);
+        const slotW = Math.floor((canvasW - padding * 2 - (cols - 1) * gap) / cols);
+        const slotH = Math.floor((canvasH - padding * 2 - (rows - 1) * gap) / rows);
+
+        const frames: { id: number; x: number; y: number; width: number; height: number }[] = [];
+        let id = 0;
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            if (id >= count) break;
+            const x = padding + c * (slotW + gap);
+            const y = padding + r * (slotH + gap);
+            frames.push({ id, x, y, width: slotW, height: slotH });
+            id++;
+          }
+        }
+        return frames;
+      };
+
+      // Helper: draw image with object-fit: cover behavior into target rect
+      const drawImageCover = (ctx: CanvasRenderingContext2D, imgEl: HTMLImageElement, dx: number, dy: number, dw: number, dh: number) => {
+        const sw = imgEl.width;
+        const sh = imgEl.height;
+        const dwRatio = dw / dh;
+        const imgRatio = sw / sh;
+
+        let sx = 0, sy = 0, sWidth = sw, sHeight = sh;
+
+        if (imgRatio > dwRatio) {
+          // Image is wider than target -> crop sides
+          sWidth = Math.round(sh * dwRatio);
+          sx = Math.round((sw - sWidth) / 2);
+        } else {
+          // Image is taller than target -> crop top/bottom
+          sHeight = Math.round(sw / dwRatio);
+          sy = Math.round((sh - sHeight) / 2);
+        }
+
+        ctx.drawImage(imgEl, sx, sy, sWidth, sHeight, dx, dy, dw, dh);
+      };
+
+      // Determine frames to use (either from template or generated grid)
+      const totalFramesCount = selectedTemplate.framesCount || capturedImages.length || 1;
+      const templateFrames = Array.isArray(selectedTemplate.frames) && selectedTemplate.frames.length >= totalFramesCount
+        ? selectedTemplate.frames
+        : generateGridFrames(totalFramesCount, canvas.width, canvas.height);
+      // Layer 0: Draw captured photos (individual) using framesToUse and cover strategy
       for (let index = 0; index < capturedImages.length; index++) {
         const img = capturedImages[index];
-        const frame = selectedTemplate.frames[index];
+        const frame = templateFrames[index];
         if (!frame) continue;
 
         const imageObj = await loadImage(img.dataUrl);
-        
-        const scaleX = CANVAS_WIDTH / 400;
-        const scaleY = CANVAS_HEIGHT / (selectedTemplate.aspectRatio === '1:1' ? 400 : 533);
 
-        const baseX = frame.x * scaleX;
-        const baseY = frame.y * scaleY;
-        const width = frame.width * scaleX;
-        const height = frame.height * scaleY;
-
-        // Apply individual photo offset
+        // Calculate destination rect
+        const width = frame.width;
+        const height = frame.height;
         const offset = photoOffsets[index] || { x: 0, y: 0 };
-        const x = baseX + offset.x;
-        const y = baseY + offset.y;
+        const x = frame.x + offset.x;
+        const y = frame.y + offset.y;
 
         ctx.save();
 
@@ -197,25 +242,24 @@ export function EditorSection() {
           ctx.filter = filterDefinitions[editorState.activeFilter];
         }
 
-        // Apply rotation and scale
-        ctx.translate(x + width / 2, y + height / 2);
-        ctx.rotate((editorState.rotation * Math.PI) / 180);
-        ctx.scale(editorState.scale, editorState.scale);
+        // Clip to frame to prevent overflow
+        ctx.beginPath();
+        ctx.rect(x, y, width, height);
+        ctx.clip();
 
-        // Draw image
-        ctx.drawImage(
-          imageObj,
-          -width / 2,
-          -height / 2,
-          width,
-          height
-        );
+        // Draw image with cover
+        try {
+          drawImageCover(ctx, imageObj, x, y, width, height);
+        } catch (err) {
+          // Fallback to simple draw
+          ctx.drawImage(imageObj, x, y, width, height);
+        }
 
         // Draw selection border for selected photo
         if (selectedPhotoIndex === index) {
           ctx.strokeStyle = '#3b82f6';
           ctx.lineWidth = 3;
-          ctx.strokeRect(-width / 2 - 5, -height / 2 - 5, width + 10, height + 10);
+          ctx.strokeRect(x - 5, y - 5, width + 10, height + 10);
         }
 
         ctx.restore();
@@ -573,14 +617,74 @@ export function EditorSection() {
 
     await renderCanvas();
 
+    // Crop vertically to bounding box covering all frames (strip) then download
     setTimeout(() => {
-      const link = document.createElement('a');
-      link.download = `photobooth-${Date.now()}.png`;
-      link.href = canvas.toDataURL('image/png');
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }, 100);
+      try {
+        const count = selectedTemplate!.framesCount || capturedImages.length || 1;
+        const framesSource = Array.isArray(selectedTemplate!.frames) && selectedTemplate!.frames.length >= count
+          ? selectedTemplate!.frames.slice(0, count)
+          : null;
+
+        // If no frames in template, recreate grid similar to renderCanvas
+        const cropFrames = framesSource ?? (() => {
+          const cols = count >= 2 ? 2 : 1;
+          const rows = Math.ceil(count / cols);
+          const padding = Math.round(Math.min(canvas.width, canvas.height) * 0.04);
+          const gap = Math.round(padding / 2);
+          const slotW = Math.floor((canvas.width - padding * 2 - (cols - 1) * gap) / cols);
+          const slotH = Math.floor((canvas.height - padding * 2 - (rows - 1) * gap) / rows);
+          const out: any[] = [];
+          let id = 0;
+          for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+              if (id >= count) break;
+              const x = padding + c * (slotW + gap);
+              const y = padding + r * (slotH + gap);
+              out.push({ id, x, y, width: slotW, height: slotH });
+              id++;
+            }
+          }
+          return out;
+        })();
+
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const f of cropFrames) {
+          minX = Math.min(minX, f.x);
+          minY = Math.min(minY, f.y);
+          maxX = Math.max(maxX, f.x + f.width);
+          maxY = Math.max(maxY, f.y + f.height);
+        }
+
+        if (!isFinite(minX) || !isFinite(minY)) {
+          minX = 0; minY = 0; maxX = canvas.width; maxY = canvas.height;
+        }
+
+        const sw = Math.max(1, Math.floor(maxX - minX));
+        const sh = Math.max(1, Math.floor(maxY - minY));
+
+        const cropCanvas = document.createElement('canvas');
+        cropCanvas.width = sw;
+        cropCanvas.height = sh;
+        const ctx = cropCanvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(canvas, Math.floor(minX), Math.floor(minY), sw, sh, 0, 0, sw, sh);
+          const link = document.createElement('a');
+          link.download = `photobooth-strip-${Date.now()}.png`;
+          link.href = cropCanvas.toDataURL('image/png');
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
+      } catch (err) {
+        // Fallback to full canvas
+        const link = document.createElement('a');
+        link.download = `photobooth-${Date.now()}.png`;
+        link.href = canvas.toDataURL('image/png');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    }, 200);
   };
 
   if (!selectedTemplate || capturedImages.length === 0) {
