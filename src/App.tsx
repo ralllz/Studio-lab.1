@@ -1,6 +1,6 @@
 import { AnimatePresence } from 'framer-motion';
 import { useStore } from '@/store/useStore';
-import { useTemplateSync } from '@/hooks/useTemplateSync';
+import { useSupabaseTemplateSync } from '@/hooks/useSupabaseTemplateSync';
 import { HomeSection } from '@/sections/HomeSection';
 import { TemplateSection } from '@/sections/TemplateSection';
 import { CaptureSection } from '@/sections/CaptureSection';
@@ -9,7 +9,7 @@ import './App.css';
 
 function App() {
   const { currentStep, isDarkMode } = useStore();
-  useTemplateSync();
+  useSupabaseTemplateSync();
 
   return (
     <div className={isDarkMode ? 'dark' : ''}>
